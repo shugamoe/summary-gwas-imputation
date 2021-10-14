@@ -17,6 +17,12 @@ COLUMN_ORDER = ["variant_id", "panel_variant_id", "chromosome", "position", "eff
                 "current_build", "frequency", "sample_size", "zscore", "pvalue", "effect_size", "standard_error",
                 "imputation_status", "n_cases"]
 
+# Add columns to indicate the lowest/highest positions of original "measured" variants used for imputed variants
+COLUMN_ORDER_IMP_INFO = ["variant_id", "panel_variant_id", "chromosome", "position", "effect_allele", "non_effect_allele",
+                # Original_build (TODO),
+                "current_build", "frequency", "sample_size", "zscore", "pvalue", "effect_size", "standard_error",
+                "imputation_status", "n_cases", "typed_min_pos", "typed_max_pos"]
+
 
 def gwas_k(d):
     r = []
@@ -33,7 +39,10 @@ def gwas_k(d):
 def process_original_gwas(args, imputed):
     logging.info("Processing GWAS file %s", args.gwas_file)
     g = pandas.read_table(args.gwas_file)
-    g = g.assign(current_build="hg38", imputation_status="original")[COLUMN_ORDER]
+    try:
+        g = g.assign(current_build="hg38", imputation_status="original")[COLUMN_ORDER_IMP_INFO]
+    except Exception:
+        g = g.assign(current_build="hg38", imputation_status="original")[COLUMN_ORDER]
     # Remember the palindromic snps are to be excluded from the input GWAS;
     logging.info("Read %d variants", g.shape[0])
 
@@ -50,7 +59,10 @@ def process_original_gwas(args, imputed):
             raise RuntimeError("Unsupported keep option")
         logging.info("Kept %d variants as observed", g.shape[0])
 
-    g = pandas.concat([g, imputed])[COLUMN_ORDER]
+    try:
+        g = pandas.concat([g, imputed])[COLUMN_ORDER_IMP_INFO]
+    except Exception:
+        g = pandas.concat([g, imputed])[COLUMN_ORDER]
     logging.info("%d variants", g.shape[0])
 
     logging.info("Filling median")
@@ -81,7 +93,10 @@ def process_imputed(args):
         g.rename(columns={"effect_allele_frequency": "frequency", "status": "imputation_status"}, inplace=True)
         g = g.assign(pvalue=2 * stats.norm.sf(numpy.abs(g.zscore)), effect_size=numpy.nan, standard_error=numpy.nan,
                      sample_size=numpy.nan, current_build="hg38", n_cases=numpy.nan)
-        g = g[COLUMN_ORDER]
+        try:
+            g = g[COLUMN_ORDER_IMP_INFO]
+        except Exception:
+            g = g[COLUMN_ORDER]
         result.append(g)
     result = pandas.concat(result)
     logging.info("Processed %d imputed variants", result.shape[0])

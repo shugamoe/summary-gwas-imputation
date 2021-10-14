@@ -208,7 +208,7 @@ def _read(file, columns=None, skip_individuals=False, to_pandas=False, specific_
         if specific_individuals:
             mask = _individual_mask(v.column(0).to_pylist(), specific_individuals)
 
-        v = {c.name:(numpy.array(c.to_pylist(), dtype=numpy.float32) if c.name != "individual" else numpy.array(c.to_pylist(), dtype=numpy.str)) for c in v}
+        v = {c.name:(numpy.array(c.to_pylist(), dtype=numpy.float64) if c.name != "individual" else numpy.array(c.to_pylist(), dtype=numpy.str)) for c in v}
         if specific_individuals:
             v = {k:d[mask] for k,d in v.items()}
     return v

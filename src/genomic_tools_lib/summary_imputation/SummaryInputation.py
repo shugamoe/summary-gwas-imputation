@@ -174,7 +174,9 @@ def _get_multi(geno, typed, cutoff, regularization):
 
     _w = d(sigma_it, sigma_inv)
     variance = numpy.sum(numpy.multiply(sigma_it,_w), axis=1)
-    return zscore, variance, sigma_tt.shape[0], n_indep
+    typed_min_pos = typed['position'].min()
+    typed_max_pos = typed['position'].max()
+    return zscore, variance, sigma_tt.shape[0], n_indep, typed_min_pos, typed_max_pos
 
 def _trim_to_region(d, region):
     return d[(d.position >= region.start) & (d.position < region.end)]
@@ -206,7 +208,7 @@ def _post_pocess(context, untyped, full_gwas_slice, gwas_slice, region):
         #untyped.loc[~untyped.measured_z.isnull(), "imputation_status"] = "original"
         untyped = untyped.drop(columns=["measured_z", "sign"])
 
-    untyped = untyped[list(Results._fields+AdditionalStats._fields)]
+    untyped = untyped[list(Results._fields+AdditionalStats._fields) + ["typed_min_pos", "typed_max_pos"]]
     return untyped
 
 
@@ -253,16 +255,17 @@ def _gaussian_by_region(context, region):
     geno = [variants[x] for x in ids]
 
     logging.log(8, "Performing imputation")
-    zscore, variance, n, n_indep = _get_multi(geno, typed, context.get_cutoff(), context.get_regularization())
+    zscore, variance, n, n_indep, typed_min_pos, typed_max_pos = _get_multi(geno, typed, context.get_cutoff(), context.get_regularization())
 
     untyped = untyped.rename(columns={"id":"panel_variant_id"}).\
-        assign(zscore=zscore, variance=variance, imputation_status="imputed", n=n, n_indep=n_indep, most_extreme_z=most_extreme_z, chromosome="chr"+untyped.chromosome.astype(str)).\
-        rename(columns={"rsid":"variant_id", "effect_allele_frequency":"frequency"})[list(Results._fields+AdditionalStats._fields)]
+        assign(zscore=zscore, variance=variance, imputation_status="imputed", n=n, n_indep=n_indep, most_extreme_z=most_extreme_z, chromosome="chr"+untyped.chromosome.astype(str), typed_min_pos=typed_min_pos, typed_max_pos=typed_max_pos).\
+        rename(columns={"rsid":"variant_id", "effect_allele_frequency":"frequency"})[list(Results._fields+AdditionalStats._fields) + ["typed_min_pos", "typed_max_pos"]]
 
     # The snps on the border of the region go to the start of the next
     untyped = _trim_to_region(untyped, region)
     logging.log(8, "Postprocessing")
     imputed = _post_pocess(context, untyped, full_gwas_slice, gwas_slice, region)
+    typed_min_pos = typed['position'].min()
 
     return imputed
 
