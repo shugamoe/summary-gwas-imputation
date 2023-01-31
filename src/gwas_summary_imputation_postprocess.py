@@ -39,6 +39,7 @@ def gwas_k(d):
 def process_original_gwas(args, imputed):
     logging.info("Processing GWAS file %s", args.gwas_file)
     g = pandas.read_table(args.gwas_file)
+
     try:
         g = g.assign(current_build="hg38", imputation_status="original")[COLUMN_ORDER_IMP_INFO]
     except Exception:
@@ -46,24 +47,29 @@ def process_original_gwas(args, imputed):
     # Remember the palindromic snps are to be excluded from the input GWAS;
     logging.info("Read %d variants", g.shape[0])
 
-    if not args.keep_all_observed:
-        if args.keep_criteria == "GTEX_VARIANT_ID":
-            g = g.loc[~ g.panel_variant_id.isin(imputed.panel_variant_id)]
-        elif args.keep_criteria == "CHR_POS":
-            g = g.assign(k = gwas_k(g))
-            imputed = imputed.assign(k = gwas_k(imputed))
-            g = g.loc[~ g.k.isin({x for x in imputed.k})]
-            g.drop("k", axis=1, inplace=True)
-            imputed.drop("k", axis=1, inplace=True)
-        else:
-            raise RuntimeError("Unsupported keep option")
-        logging.info("Kept %d variants as observed", g.shape[0])
+    # JCM: Sometimes in cojo we don't actually need to impute stuff so we'll have nothing in the imputed dataframe
+    if imputed.shape[0] == 0:
+        num_snps = g.shape[0]
+        logging.info("Nothing imputed. There are {} SNPs in the original GWAS.".format(num_snps))
+    else:
+        if not args.keep_all_observed:
+            if args.keep_criteria == "GTEX_VARIANT_ID":
+                g = g.loc[~ g.panel_variant_id.isin(imputed.panel_variant_id)]
+            elif args.keep_criteria == "CHR_POS":
+                g = g.assign(k = gwas_k(g))
+                imputed = imputed.assign(k = gwas_k(imputed))
+                g = g.loc[~ g.k.isin({x for x in imputed.k})]
+                g.drop("k", axis=1, inplace=True)
+                imputed.drop("k", axis=1, inplace=True)
+            else:
+                raise RuntimeError("Unsupported keep option")
+            logging.info("Kept %d variants as observed", g.shape[0])
 
-    try:
-        g = pandas.concat([g, imputed])[COLUMN_ORDER_IMP_INFO]
-    except Exception:
-        g = pandas.concat([g, imputed])[COLUMN_ORDER]
-    logging.info("%d variants", g.shape[0])
+        try:
+            g = pandas.concat([g, imputed])[COLUMN_ORDER_IMP_INFO]
+        except Exception:
+            g = pandas.concat([g, imputed])[COLUMN_ORDER]
+        logging.info("%d variants", g.shape[0])
 
     logging.info("Filling median")
     g = Genomics.fill_column_to_median(g, "sample_size", numpy.int32)
@@ -98,7 +104,10 @@ def process_imputed(args):
         except Exception:
             g = g[COLUMN_ORDER]
         result.append(g)
-    result = pandas.concat(result)
+    try:
+        result = pandas.concat(result)
+    except ValueError:
+        result = pandas.DataFrame()
     logging.info("Processed %d imputed variants", result.shape[0])
     return result
 

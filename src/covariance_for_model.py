@@ -15,7 +15,7 @@ from genomic_tools_lib.data_management import TextFileTools
 from genomic_tools_lib.miscellaneous import matrices, PandasHelpers
 from genomic_tools_lib.file_formats import Parquet
 
-def get_file_map(args):
+def get_file_map(args, want_chr=None):
     logging.log(9, "Loading parquet files")
     r = re.compile(args.parquet_genotype_pattern)
     files = os.listdir(args.parquet_genotype_folder)
@@ -24,6 +24,9 @@ def get_file_map(args):
     keys = sorted(files.keys())
     for k in files.keys():
         v = files[k]
+        if want_chr != None:
+            if want_chr not in v:
+                continue
         logging.log(9, "Loading %i:%s", k, v)
         g = pq.ParquetFile(v)
         p[k] = g
