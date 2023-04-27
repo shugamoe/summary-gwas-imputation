@@ -60,7 +60,12 @@ def run(args):
                 g_ = t.gene
                 logging.log(9, "Proccessing %i/%i:%s", i+1, extra.shape[0], g_)
                 w = pandas.read_sql("select * from weights where gene = '{}';".format(g_), connection)
-                chr_ = w.varID.values[0].split("_")[0].split("chr")[1]
+
+                # Sometimes can have "chr1_12312312" or "1_12312312"
+                try:
+                    chr_ = w.varID.values[0].split("_")[0].split("chr")[1]
+                except IndexError:
+                    chr_ = w.varID.values[0].split("_")[0]
                 if not n_.search(chr_):
                     logging.log(9, "Unsupported chromosome: %s", chr_)
                     continue
